@@ -1,0 +1,32 @@
+POST http://127.0.0.1:8081/add_item
+Content-Type: application/json
+
+{
+  "done": false,
+  "text": "learn English"
+}
+
+###
+
+POST http://127.0.0.1:8081/update_item_status
+Content-Type: application/json
+
+{
+  "index": 0
+}
+
+###
+
+POST http://127.0.0.1:8081/update_item_text
+Content-Type: application/json
+
+{
+  "index": 1,
+  "text": "play Diablo 2"
+}
+
+###
+
+GET http://127.0.0.1:8081/
+
+###
