@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/Sprow/todo/cmd/serve/handler"
-	"github.com/Sprow/todo/internal/todo"
+	"github.com/Sprow/todo/internal/session"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
@@ -12,17 +12,8 @@ import (
 func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	todoListManager := todo.NewManager(todo.List{
-		Title: "todo list 1",
-		Items: []todo.Item{{
-			Done: false,
-			Text: "learn English",
-		}, {
-			Done: true,
-			Text: " learn French",
-		}},
-	})
-	h := handler.NewHandler(todoListManager)
+	s := session.NewManagerSession()
+	h := handler.NewHandler(s)
 
 	h.Register(r)
 

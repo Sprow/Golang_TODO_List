@@ -3,29 +3,35 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Sprow/todo/internal/session"
 	"github.com/Sprow/todo/internal/todo"
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/xid"
 	"net/http"
+	"time"
 )
 
 type Handler struct {
-	todoManager *todo.Manager
+	managerSession *session.ManagerSession
 }
 
-func NewHandler(todoManager *todo.Manager) *Handler {
+func NewHandler(managerSession *session.ManagerSession) *Handler {
 	return &Handler{
-		todoManager: todoManager,
+		managerSession: managerSession,
 	}
 }
 
 func (h *Handler) Register(r *chi.Mux) {
-	r.Post("/add_item", h.addItem)
-	r.Post("/update_item_status", h.updateItemStatus)
-	r.Post("/update_item_text", h.updateItemText)
-	r.Get("/", h.getAllTodos)
+	r.Post("/add_item", h.sessionMiddleware(h.addItem))
+	r.Post("/update_item_status", h.sessionMiddleware(h.updateItemStatus))
+	r.Post("/update_item_text", h.sessionMiddleware(h.updateItemText))
+	r.Get("/", h.sessionMiddleware(h.getAllTodos))
 }
 
 func (h *Handler) addItem(w http.ResponseWriter, r *http.Request) {
+	todoManager := h.managerSession.GetSession(h.getToken(r))
+
+	fmt.Println("add item Header >>>", r.Header)
 	d := json.NewDecoder(r.Body)
 	var item todo.Item
 	err := d.Decode(&item)
@@ -35,7 +41,7 @@ func (h *Handler) addItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.todoManager.AddItem(item)
+	todoManager.AddItem(item)
 	fmt.Println("add item>>>", item)
 }
 
@@ -44,6 +50,8 @@ type indexDTO struct {
 }
 
 func (h *Handler) updateItemStatus(w http.ResponseWriter, r *http.Request) {
+	todoManager := h.managerSession.GetSession(h.getToken(r))
+
 	d := json.NewDecoder(r.Body)
 	var index indexDTO
 	err := d.Decode(&index)
@@ -52,12 +60,13 @@ func (h *Handler) updateItemStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "не сомог декодировать", http.StatusBadRequest)
 		return
 	}
-	h.todoManager.UpdateItemStatus(index.Index)
+	todoManager.UpdateItemStatus(index.Index)
 }
 
 func (h *Handler) getAllTodos(w http.ResponseWriter, r *http.Request) {
+	todoManager := h.managerSession.GetSession(h.getToken(r))
 	e := json.NewEncoder(w)
-	data := h.todoManager.GetAllTodos()
+	data := todoManager.GetAllTodos()
 	e.SetIndent("", "  ") // фомотирует джейсон которвый приходит
 	err := e.Encode(data)
 	if err != nil {
@@ -66,6 +75,7 @@ func (h *Handler) getAllTodos(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) removeItem(w http.ResponseWriter, r *http.Request) {
+	todoManager := h.managerSession.GetSession(h.getToken(r))
 	d := json.NewDecoder(r.Body)
 	var index indexDTO
 	err := d.Decode(&index)
@@ -74,7 +84,7 @@ func (h *Handler) removeItem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "не сомог декодировать", http.StatusBadRequest)
 		return
 	}
-	h.todoManager.RemoveItem(index.Index)
+	todoManager.RemoveItem(index.Index)
 }
 
 type updateTextDTO struct {
@@ -83,6 +93,7 @@ type updateTextDTO struct {
 }
 
 func (h *Handler) updateItemText(w http.ResponseWriter, r *http.Request) {
+	todoManager := h.managerSession.GetSession(h.getToken(r))
 	d := json.NewDecoder(r.Body)
 	var textToUpdate updateTextDTO
 	err := d.Decode(&textToUpdate)
@@ -91,5 +102,34 @@ func (h *Handler) updateItemText(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "не сомог декодировать", http.StatusBadRequest)
 		return
 	}
-	h.todoManager.UpdateItemText(textToUpdate.Index, textToUpdate.Text)
+	todoManager.UpdateItemText(textToUpdate.Index, textToUpdate.Text)
+}
+
+func (h *Handler) getToken(r *http.Request) string {
+	c, err := r.Cookie("token")
+	if err != nil {
+		return ""
+	}
+	return c.Value
+}
+
+func (h *Handler) sessionMiddleware(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		t := h.getToken(r)
+
+		if t == "" {
+			cookie := http.Cookie{
+				Name:     "token",
+				Value:    xid.New().String(),             //new token
+				Expires:  time.Now().Add(24 * time.Hour), //user lose his todolist after 24h
+				HttpOnly: true,
+			}
+			http.SetCookie(w, &cookie)
+
+			r.AddCookie(&cookie)
+		}
+
+		handler(w, r)
+	}
+
 }
