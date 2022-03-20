@@ -10,7 +10,7 @@ type ManagerSession struct {
 	session map[string]*todo.Manager
 }
 
-func NewManagerSession() *ManagerSession { // ????? any input???
+func NewManagerSession() *ManagerSession {
 	return &ManagerSession{
 		session: make(map[string]*todo.Manager),
 	}

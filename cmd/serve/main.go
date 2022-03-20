@@ -10,13 +10,12 @@ import (
 )
 
 func main() {
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
 	s := session.NewManagerSession()
 	h := handler.NewHandler(s)
 
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
 	h.Register(r)
-
 	err := http.ListenAndServe("0.0.0.0:8081", r)
 	if err != nil {
 		fmt.Println(err)
